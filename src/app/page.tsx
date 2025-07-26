@@ -22,8 +22,17 @@ export default function Home() {
           <div className="grid auto-rows-max items-start gap-6 lg:col-span-2">
             <MapView />
             <div className="grid gap-6 md:grid-cols-2">
-              <VideoFeed feedName="Ghat 1" crowdDensity="High" />
-              <VideoFeed feedName="Main Street" initialAnomalyDetected={true} crowdDensity="Critical" />
+              <VideoFeed 
+                feedName="Ghat 1" 
+                crowdDensity="High" 
+                videoSrc="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4" 
+              />
+              <VideoFeed 
+                feedName="Main Street" 
+                initialAnomalyDetected={true} 
+                crowdDensity="Critical" 
+                videoSrc="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+              />
             </div>
           </div>
           <div className="grid auto-rows-max items-start gap-6 lg:col-span-1">

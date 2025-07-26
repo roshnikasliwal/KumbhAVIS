@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 
 interface VideoFeedProps {
   feedName: string;
+  videoSrc: string;
   initialAnomalyDetected?: boolean;
   crowdDensity: 'Low' | 'Medium' | 'High' | 'Critical';
 }
@@ -22,40 +23,41 @@ const densityValues: Record<VideoFeedProps['crowdDensity'], number> = {
   Critical: 95,
 };
 
-export function VideoFeed({ feedName, initialAnomalyDetected = false, crowdDensity }: VideoFeedProps) {
+export function VideoFeed({ feedName, videoSrc, initialAnomalyDetected = false, crowdDensity }: VideoFeedProps) {
   const [anomaly, setAnomaly] = useState<{ detected: boolean, type: string, description: string } | null>(initialAnomalyDetected ? { detected: true, type: "Initial", description: "Anomaly detected upon load." } : null);
   const [isScanning, setIsScanning] = useState(false);
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [isLive, setIsLive] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
+  const handleCanPlay = () => {
+    setIsLive(true);
+  };
+  
+  const handleOffline = () => {
+    setIsLive(false);
+  }
+
   useEffect(() => {
-    const getCameraPermission = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        setHasCameraPermission(true);
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+    const video = videoRef.current;
+    if (video) {
+        video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('error', handleOffline);
+        video.addEventListener('stalled', handleOffline);
+    }
+    return () => {
+        if(video) {
+            video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('error', handleOffline);
+            video.removeEventListener('stalled', handleOffline);
         }
-      } catch (error) {
-        console.error('Error accessing camera:', error);
-        setHasCameraPermission(false);
-        toast({
-          variant: 'destructive',
-          title: 'Camera Access Denied',
-          description: 'Please enable camera permissions to use live anomaly detection.',
-        });
-      }
     };
-
-    getCameraPermission();
-  }, [toast]);
+  }, []);
 
   const captureAndAnalyzeFrame = useCallback(async () => {
-    if (!videoRef.current || !canvasRef.current || isScanning) return;
+    if (!videoRef.current || !canvasRef.current || isScanning || videoRef.current.paused) return;
 
     setIsScanning(true);
     const video = videoRef.current;
@@ -77,8 +79,10 @@ export function VideoFeed({ feedName, initialAnomalyDetected = false, crowdDensi
               description: `${feedName}: ${result.data.description}`,
             });
         } else if (result.success && !result.data?.isAnomaly) {
-            // Optional: reset anomaly state if it's clear
-            // setAnomaly(null);
+             // Optional: reset anomaly state if it's clear after a few clean checks
+             // if (anomaly) {
+             //   setAnomaly(null);
+             // }
         } else if (!result.success) {
             console.error("Anomaly check failed:", result.message);
         }
@@ -88,16 +92,15 @@ export function VideoFeed({ feedName, initialAnomalyDetected = false, crowdDensi
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
-    if (hasCameraPermission) {
-      // Start scanning every 10 seconds
-      intervalId = setInterval(captureAndAnalyzeFrame, 10000);
+    if (isLive) {
+      intervalId = setInterval(captureAndAnalyzeFrame, 10000); // Scan every 10 seconds
     }
     return () => {
       if (intervalId) {
         clearInterval(intervalId);
       }
     };
-  }, [hasCameraPermission, captureAndAnalyzeFrame]);
+  }, [isLive, captureAndAnalyzeFrame]);
 
   const isHighDensity = crowdDensity === 'High' || crowdDensity === 'Critical';
 
@@ -114,24 +117,33 @@ export function VideoFeed({ feedName, initialAnomalyDetected = false, crowdDensi
             ) : (
                 <>
                     <span className="relative flex h-3 w-3">
-                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${hasCameraPermission ? 'bg-green-400' : 'bg-destructive'} opacity-75`}></span>
-                        <span className={`relative inline-flex h-3 w-3 rounded-full ${hasCameraPermission ? 'bg-green-500' : 'bg-destructive'}`}></span>
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isLive ? 'bg-green-400' : 'bg-destructive'} opacity-75`}></span>
+                        <span className={`relative inline-flex h-3 w-3 rounded-full ${isLive ? 'bg-green-500' : 'bg-destructive'}`}></span>
                     </span>
-                    <span className={`text-sm font-semibold ${hasCameraPermission ? 'text-green-400' : 'text-destructive'}`}>
-                        {hasCameraPermission ? 'LIVE' : 'OFFLINE'}
+                    <span className={`text-sm font-semibold ${isLive ? 'text-green-400' : 'text-destructive'}`}>
+                        {isLive ? 'LIVE' : 'OFFLINE'}
                     </span>
                 </>
             )}
           </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="aspect-video overflow-hidden bg-muted">
-            <video ref={videoRef} className="w-full aspect-video rounded-md" autoPlay muted playsInline />
+        <div className="aspect-video overflow-hidden bg-muted relative">
+            <video 
+                ref={videoRef} 
+                src={videoSrc}
+                className="w-full aspect-video rounded-md" 
+                autoPlay 
+                muted 
+                loop
+                playsInline 
+                crossOrigin="anonymous"
+            />
             <canvas ref={canvasRef} className="hidden" />
-             {hasCameraPermission === false && (
+             {!isLive && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/80 p-4">
                     <Video className="h-12 w-12 text-muted-foreground" />
-                    <p className="text-center text-muted-foreground">Camera access is required for live anomaly detection. Please grant permission in your browser.</p>
+                    <p className="text-center text-muted-foreground">Video feed is currently offline or unavailable.</p>
                 </div>
             )}
         </div>
