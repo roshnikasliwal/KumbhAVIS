@@ -7,6 +7,9 @@ import { LogsPanel } from "@/components/dashboard/logs-panel";
 import { Users, AlertTriangle, ShieldCheck, MapPin } from "lucide-react";
 
 export default function Home() {
+  const storageBucket = "kumbhavis.firebasestorage.app";
+  const videoBasePath = `https://storage.googleapis.com/${storageBucket}`;
+
   return (
     <div className="flex min-h-screen w-full flex-col">
       <Header />
@@ -25,13 +28,13 @@ export default function Home() {
               <VideoFeed 
                 feedName="Ghat 1" 
                 crowdDensity="High" 
-                videoSrc="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4" 
+                videoSrc={`${videoBasePath}/video1.mp4`}
               />
               <VideoFeed 
                 feedName="Main Street" 
                 initialAnomalyDetected={true} 
                 crowdDensity="Critical" 
-                videoSrc="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                videoSrc={`${videoBasePath}/video2.mp4`}
               />
             </div>
           </div>
