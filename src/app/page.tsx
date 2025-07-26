@@ -1,49 +1,24 @@
-import { Header } from "@/components/dashboard/header";
-import { KpiCard } from "@/components/dashboard/kpi-card";
-import { MapView } from "@/components/dashboard/map-view";
-import { VideoFeed } from "@/components/dashboard/video-feed";
-import { AlertsPanel } from "@/components/dashboard/alerts-panel";
-import { LogsPanel } from "@/components/dashboard/logs-panel";
-import { Users, AlertTriangle, ShieldCheck, MapPin } from "lucide-react";
+'use client';
 
-export default function Home() {
-  const storageBucket = "kumbhavis.firebasestorage.app";
-  const videoBasePath = `https://storage.googleapis.com/${storageBucket}`;
+import * as React from 'react';
+import { DashboardCards } from '@/components/kumbhview/dashboard-cards';
+import { IncidentChart } from '@/components/kumbhview/incident-chart';
+import { LiveAlerts } from '@/components/kumbhview/live-alerts';
+import { CrowdHeatmap } from '@/components/kumbhview/crowd-heatmap';
+import { Role } from '@/lib/types';
 
+export default function Dashboard() {
+  const [role, setRole] = React.useState<Role>('Administrator');
   return (
-    <div className="flex min-h-screen w-full flex-col">
-      <Header />
-      <main className="flex-1 space-y-6 p-4 md:p-6 lg:p-8">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard title="Crowd Density" value="High" icon={<Users className="text-primary" />} />
-          <KpiCard title="Active Alerts" value="3" icon={<AlertTriangle className="text-destructive" />} />
-          <KpiCard title="Personnel Deployed" value="47" icon={<ShieldCheck className="text-primary" />} />
-          <KpiCard title="Monitored Zones" value="12" icon={<MapPin className="text-primary" />} />
-        </div>
-
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-          <div className="grid auto-rows-max items-start gap-6 lg:col-span-2">
-            <MapView />
-            <div className="grid gap-6 md:grid-cols-2">
-              <VideoFeed 
-                feedName="Ghat 1" 
-                crowdDensity="High" 
-                videoSrc={`${videoBasePath}/video1.mp4`}
-              />
-              <VideoFeed 
-                feedName="Main Street" 
-                initialAnomalyDetected={true} 
-                crowdDensity="Critical" 
-                videoSrc={`${videoBasePath}/video2.mp4`}
-              />
-            </div>
-          </div>
-          <div className="grid auto-rows-max items-start gap-6 lg:col-span-1">
-            <AlertsPanel />
-            <LogsPanel />
-          </div>
-        </div>
-      </main>
-    </div>
+    <main className="grid flex-1 items-start gap-4 md:gap-8 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2 xl:col-span-4">
+        <DashboardCards />
+        <IncidentChart />
+      </div>
+      <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-1 xl:col-span-2">
+        <CrowdHeatmap />
+        <LiveAlerts role={role} />
+      </div>
+    </main>
   );
 }
