@@ -39,15 +39,16 @@ const prompt = ai.definePrompt({
   name: 'detectMultimodalAnomaliesPrompt',
   input: {schema: DetectMultimodalAnomaliesInputSchema},
   output: {schema: DetectMultimodalAnomaliesOutputSchema},
+  model: 'vertexai/gemini-1.5-flash-preview',
   prompt: `You are an AI security expert monitoring a live video feed from a crowded public event. Your task is to analyze the provided image frame and detect any anomalies.
 
   Anomalies to look for include, but are not limited to:
   - Smoke or fire
-  - Visual signatures of a crowd surge or panic (people running in the same direction, expressions of fear)
-  - Large unattended objects or obstructions
+  - Visual signatures of a crowd surge or panic (people running in the same direction, expressions of fear, large gaps opening in the crowd)
+  - Large unattended objects or obstructions in pathways
   - Fights or violent altercations
 
-  If an anomaly is detected, set isAnomaly to true, specify the anomalyType, and provide a concise description. If the scene appears normal, set isAnomaly to false and anomalyType to "None".
+  If an anomaly is detected, set isAnomaly to true, specify the anomalyType, and provide a concise description. If the scene appears normal, set isAnomaly to false and anomalyType to "None". Be precise and act as a real-time security system.
 
   Image to analyze: {{media url=imageDataUri}}
   `,
