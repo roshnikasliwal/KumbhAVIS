@@ -23,7 +23,7 @@ export default function Home() {
             <MapView />
             <div className="grid gap-6 md:grid-cols-2">
               <VideoFeed feedName="Ghat 1" crowdDensity="High" />
-              <VideoFeed feedName="Main Street" anomalyDetected={true} crowdDensity="Critical" />
+              <VideoFeed feedName="Main Street" initialAnomalyDetected={true} crowdDensity="Critical" />
             </div>
           </div>
           <div className="grid auto-rows-max items-start gap-6 lg:col-span-1">

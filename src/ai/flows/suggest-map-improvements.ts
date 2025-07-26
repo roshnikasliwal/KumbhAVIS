@@ -1,5 +1,3 @@
-'use server';
-
 /**
  * @fileOverview An AI agent that suggests map improvements based on the event type.
  *

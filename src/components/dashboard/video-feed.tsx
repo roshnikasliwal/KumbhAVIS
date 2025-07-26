@@ -1,12 +1,17 @@
+"use client";
+
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import Image from "next/image";
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Video, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { checkFrameForAnomalies } from "@/app/actions";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 
 interface VideoFeedProps {
   feedName: string;
-  anomalyDetected?: boolean;
+  initialAnomalyDetected?: boolean;
   crowdDensity: 'Low' | 'Medium' | 'High' | 'Critical';
 }
 
@@ -17,7 +22,83 @@ const densityValues: Record<VideoFeedProps['crowdDensity'], number> = {
   Critical: 95,
 };
 
-export function VideoFeed({ feedName, anomalyDetected = false, crowdDensity }: VideoFeedProps) {
+export function VideoFeed({ feedName, initialAnomalyDetected = false, crowdDensity }: VideoFeedProps) {
+  const [anomaly, setAnomaly] = useState<{ detected: boolean, type: string, description: string } | null>(initialAnomalyDetected ? { detected: true, type: "Initial", description: "Anomaly detected upon load." } : null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const getCameraPermission = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        setHasCameraPermission(true);
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+        setHasCameraPermission(false);
+        toast({
+          variant: 'destructive',
+          title: 'Camera Access Denied',
+          description: 'Please enable camera permissions to use live anomaly detection.',
+        });
+      }
+    };
+
+    getCameraPermission();
+  }, [toast]);
+
+  const captureAndAnalyzeFrame = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current || isScanning) return;
+
+    setIsScanning(true);
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    if (context) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageDataUri = canvas.toDataURL('image/jpeg');
+        
+        const result = await checkFrameForAnomalies({ imageDataUri });
+
+        if (result.success && result.data?.isAnomaly) {
+            setAnomaly({ detected: true, type: result.data.anomalyType, description: result.data.description });
+            toast({
+              variant: 'destructive',
+              title: `Anomaly Detected: ${result.data.anomalyType}`,
+              description: `${feedName}: ${result.data.description}`,
+            });
+        } else if (result.success && !result.data?.isAnomaly) {
+            // Optional: reset anomaly state if it's clear
+            // setAnomaly(null);
+        } else if (!result.success) {
+            console.error("Anomaly check failed:", result.message);
+        }
+    }
+    setIsScanning(false);
+  }, [isScanning, feedName, toast]);
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    if (hasCameraPermission) {
+      // Start scanning every 10 seconds
+      intervalId = setInterval(captureAndAnalyzeFrame, 10000);
+    }
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [hasCameraPermission, captureAndAnalyzeFrame]);
+
   const isHighDensity = crowdDensity === 'High' || crowdDensity === 'Critical';
 
   return (
@@ -25,31 +106,45 @@ export function VideoFeed({ feedName, anomalyDetected = false, crowdDensity }: V
       <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-lg">{feedName}</CardTitle>
           <div className="flex items-center gap-2">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex h-3 w-3 rounded-full bg-green-500"></span>
-            </span>
-            <span className="text-sm font-semibold text-green-400">LIVE</span>
+            {isScanning ? (
+                <>
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <span className="text-sm font-semibold text-primary">SCANNING</span>
+                </>
+            ) : (
+                <>
+                    <span className="relative flex h-3 w-3">
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${hasCameraPermission ? 'bg-green-400' : 'bg-destructive'} opacity-75`}></span>
+                        <span className={`relative inline-flex h-3 w-3 rounded-full ${hasCameraPermission ? 'bg-green-500' : 'bg-destructive'}`}></span>
+                    </span>
+                    <span className={`text-sm font-semibold ${hasCameraPermission ? 'text-green-400' : 'text-destructive'}`}>
+                        {hasCameraPermission ? 'LIVE' : 'OFFLINE'}
+                    </span>
+                </>
+            )}
           </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="aspect-video overflow-hidden">
-          <Image
-            src="https://placehold.co/1280x720"
-            alt={`Live feed from ${feedName}`}
-            width={1280}
-            height={720}
-            data-ai-hint="cctv crowd"
-            className="h-full w-full object-cover"
-          />
+        <div className="aspect-video overflow-hidden bg-muted">
+            <video ref={videoRef} className="w-full aspect-video rounded-md" autoPlay muted playsInline />
+            <canvas ref={canvasRef} className="hidden" />
+             {hasCameraPermission === false && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/80 p-4">
+                    <Video className="h-12 w-12 text-muted-foreground" />
+                    <p className="text-center text-muted-foreground">Camera access is required for live anomaly detection. Please grant permission in your browser.</p>
+                </div>
+            )}
         </div>
       </CardContent>
       <CardFooter className="flex flex-col items-start gap-4 bg-muted/30 p-4">
-        {anomalyDetected && (
-          <Badge variant="destructive" className="w-full animate-pulse justify-center py-1.5 text-base">
-            <AlertTriangle className="mr-2 h-5 w-5" />
-            ANOMALY DETECTED
-          </Badge>
+        {anomaly?.detected && (
+          <Alert variant="destructive" className="w-full animate-pulse">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>{anomaly.type.toUpperCase()} DETECTED</AlertTitle>
+            <AlertDescription>
+                {anomaly.description}
+            </AlertDescription>
+          </Alert>
         )}
         <div className="w-full">
             <div className="mb-1 flex items-baseline justify-between">
